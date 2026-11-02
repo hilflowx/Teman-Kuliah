@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">TemanKuliah</string>
+    <string name="widget_today_description">Jadwal kuliah dan tugas hari ini</string>
+    <string name="alarm_status_ringing">Sedang berdering</string>
+</resources>

@@ -1,0 +1,25 @@
+# Gradle cache and build outputs
+.gradle/
+.kotlin/
+.build-outputs/
+build/
+app/build/
+
+# Local configuration
+local.properties
+*.lock
+*.bin
+
+# Rahasia: jangan pernah di-commit
+.env
+.env.*
+*.keystore
+*.jks
+debug.keystore
+
+# IDE dan keluaran build
+.idea/
+*.iml
+captures/
+*.apk
+*.aab

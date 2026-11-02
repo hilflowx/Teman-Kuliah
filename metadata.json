@@ -1,0 +1,6 @@
+{
+  "name": "TemanKuliah",
+  "description": "Aplikasi TemanKuliah untuk mendampingi jadwal kuliah dan tugas mahasiswa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

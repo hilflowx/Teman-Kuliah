@@ -1,0 +1,193 @@
+name: Android CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-tests:
+    name: Quality Checks & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 1. Android Lint: Checks unused resources, unused IDs, and warnings as errors
+      - name: Run Android Lint
+        id: lint
+        run: ./gradlew :app:lintDebug --stacktrace
+
+      # Upload Lint reports when lint check fails
+      - name: Upload Lint Report on Failure
+        if: failure() && steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+            app/build/reports/lint-results-debug.txt
+          if-no-files-found: ignore
+
+      # 2. Detekt: Analyzes unused imports, variables, parameters, private functions, and complexity against baseline
+      - name: Run Detekt
+        if: success() || failure()
+        id: detekt
+        run: ./gradlew :app:detekt --stacktrace
+
+      # Upload Detekt reports when detekt check fails
+      - name: Upload Detekt Report on Failure
+        if: failure() && steps.detekt.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-report
+          path: |
+            app/build/reports/detekt/detekt.html
+            app/build/reports/detekt/detekt.xml
+            app/build/reports/detekt/detekt.txt
+          if-no-files-found: ignore
+
+      # 3. Dependency Analysis: Checks for unused or misconfigured dependencies
+      - name: Run Dependency Analysis (buildHealth)
+        if: success() || failure()
+        id: dependency-analysis
+        run: ./gradlew :buildHealth --stacktrace
+
+      - name: Upload Dependency Analysis Report on Failure
+        if: failure() && steps.dependency-analysis.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-analysis-report
+          path: build/reports/dependency-analysis/
+          if-no-files-found: ignore
+
+      # 4. Unit Tests (includes Kotlin compiler with allWarningsAsErrors)
+      - name: Run Unit Tests
+        if: success() || failure()
+        run: ./gradlew :app:testDebugUnitTest --continue --stacktrace
+
+      - name: Upload Unit Test Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+
+  duplicate-code:
+    name: Duplicate Code (jscpd, informatif)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Tidak memblokir PR: hasilnya dipakai sebagai bahan refactor, bukan syarat lolos.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run jscpd
+        run: npx --yes jscpd@4 --config .jscpd.json
+
+      - name: Upload jscpd report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jscpd-report
+          path: build/reports/jscpd/
+          if-no-files-found: ignore
+
+  build-debug-apk:
+    name: Build Debug APK
+    needs: quality-and-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+
+  build-release-r8:
+    name: Build Release (R8 check, unsigned)
+    needs: quality-and-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Tanpa KEYSTORE_PATH: APK tidak ditandatangani. Tujuan job ini hanya memastikan
+      # minify (R8) dan shrink resources lolos, bukan menghasilkan berkas rilis.
+      - name: Build Release (unsigned, R8)
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Upload R8 Reports on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-r8-reports
+          path: |
+            app/build/outputs/mapping/release/
+            app/build/reports/
+          if-no-files-found: ignore

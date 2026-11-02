@@ -1,0 +1,11 @@
+{
+  "path": ["app/src/main/java"],
+  "format": ["kotlin"],
+  "minLines": 10,
+  "minTokens": 80,
+  "threshold": 5,
+  "ignore": ["**/build/**", "**/generated/**"],
+  "reporters": ["console", "json", "html"],
+  "output": "build/reports/jscpd",
+  "gitignore": true
+}

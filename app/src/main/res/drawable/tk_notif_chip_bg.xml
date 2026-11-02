@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Latar chip pada notifikasi pengingat: pil biru transparan, terbaca di mode terang dan gelap. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#291F6FD9" />
+    <corners android:radius="100dp" />
+</shape>
